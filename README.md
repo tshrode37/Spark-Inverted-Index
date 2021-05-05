@@ -21,7 +21,7 @@ We add the `CreationData like %2017%` to reduce the amount of data we query, and
 
 There are various options for running Spark. It can be run on your local machine, but the "easier" choice is to use a GCP cloudproc cluster because they have Spark and Pyspark installed by default. To run a Jupyter notebook with a GCP cloudproc instance, a SSH tunnel eeds to be set up. By using the GCP method like this one, we can work with a PySpark kernel in Jupyter notebook to avoid having to download Spark internally. From here, we can load Spark and SparkContext, which is the main entry point for Spark functionality.
 
-### Uploading and Using the Data
+### Uploading and Preparing the Data
 
 To use our collected data, we need to upload our file to Google Bucket Storage, which is is the basic containers that hold your data in Cloud Storage. Everything that you store in Cloud Storage must be contained in a bucket, which can be used to organize your data and control access to your data. To upload our data, we can simply drag-and-drop the files into the bucket. 
 
@@ -54,8 +54,37 @@ no.null.map(split_strip.take(5)) #ensure function above returns proper data
 split_id = no.null.map(split_strip) # saves distributed dataset
 ```
 
+### Map
 
+First, we will use `flatMap()` function to map each input item from our RDD to 0 or more output items and return a RDD. In other words, we use this method combined with the lambda function to get data from a list of words in the Tags column and get one Post ID to a create a (Tag, ID) tuple. Utilizing the lambda function, we will `flatMap()` each Tag and create a key-value pair that looks like (Tag, ID) and save it in a variable.  
 
+```python
+tag_to_id = split_id.flatMap(lambda x: [(tag, x[0]) for tag in x[1]])
+tag_to_id.take(10)
+```
+
+### Reduce
+
+Now, we can use the `groupByKey()` to perform an operation that receives a key-value pair as an input, groups the values based on key, and then outputs a dataset of key-iterable pairs. In other words, this method allows us to collect all the ID (values) which have a common Tag (Key).
+
+```python
+grouped_by_key = tag_to_id.groupByKey()
+grouped_by_key.take(5) #returns an pyspark.resultiterable.ResultIterable object
+```
+Finally, we need to transform our grouped data above to a list so we have the values readily available.
+
+```python
+inverted_index = grouped_by_key.map(lambda x: (x[0], list(x[1])))
+inverted_index.take(5)
+```
+
+To save our inverted index, we can use the `saveAsTextFile()` function to save our data in a folder similar to when Hadoop outputs it’s mapreduce files. In other words, the output format is like HDFS, with files broken up in parts. We will save our data to our Google Bucket for our cluster. 
+
+```python
+inverted_index.saveAsTextFile('<file path>/<file name.csv>')
+```
+
+The final inverted index raw output can be found in the file `Inverted_index_output.csv_part-00000`.
 
 ## Resources
 
